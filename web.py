@@ -5,9 +5,9 @@ import datetime
 from time import sleep, time
 from stqdm import stqdm
 import pandas as pd
+from PIL import Image
 
 from arline_quantum.gate_chain.gate_chain import GateChain
-from arline_ml.compiler.strategies.strategy import Strategy
 from arline_benchmarks.pipeline.pipeline import Pipeline
 from arline_quantum.qubit_connectivities.qubit_connectivity import QubitConnectivity
 from arline_quantum.hardware import Hardware
@@ -18,45 +18,42 @@ from arline_benchmarks.targets.target import Target
 from arline_benchmarks.strategies.qiskit_transpile import QiskitTranspile
 from arline_quantum.hardware import hardware_by_name
 from arline_benchmarks.engines.pipeline_engine import PipelineEngine
-
-#
-from arline_ml.compiler.strategies.strategy import Strategy as MlStrategy
 import arline_benchmarks.pipeline.pipeline as benchmark_pipeline
-benchmark_pipeline.Strategy = MlStrategy
 
+# Arline ML imports
+# from arline_ml.compiler.strategies.strategy import Strategy as MlStrategy
+# benchmark_pipeline.Strategy = MlStrategy
+
+# from arline_ml.compiler.strategies.strategy import Strategy
 # from arline_benchmarks.config_parser.pipeline_config_parser import PipelineConfigParser
 # from arline_benchmarks.engines.pipeline_engine import PipelineEngine
+
+# Latex report
 # from arline_benchmarks.reports.latex_report import LatexReport
-from PIL import Image
 
 im = Image.open("arline.png")
 st.set_page_config(page_title='ArlineQ', page_icon=im, layout="wide",)
 
 # st.title("Arline Benchmarks")
 st.markdown("""<p align="center"><h1 align="center">Arline Benchmarks</h1></p>""", unsafe_allow_html=True)
-
-
-
 st.sidebar.markdown("## Quantum compilation frameworks")
 
-
 add_qiskit = st.sidebar.checkbox("Qiskit", value=True)
-add_tket = st.sidebar.checkbox("Tket", value=True)
+# add_tket = st.sidebar.checkbox("Tket", value=True)
 add_cirq = st.sidebar.checkbox("Cirq", value=True)
-add_voqc = st.sidebar.checkbox("VOQC", value=True)
+# add_voqc = st.sidebar.checkbox("VOQC", value=True)
 add_pyzx = st.sidebar.checkbox("PyZX", value=True)
 
 
 
 compilers_list = [{"Qiskit": add_qiskit},
-                  {"Tket": add_tket},
+                  # {"Tket": add_tket},
                   {"Cirq": add_cirq},
-                  {"VOQC": add_voqc},
+                  # {"VOQC": add_voqc},
                   {"PyZX": add_pyzx}]
-num_compilers = sum([add_qiskit, add_tket, add_cirq, add_voqc, add_pyzx])
 
-
-
+num_compilers = sum([add_qiskit, add_cirq, add_pyzx,
+                    add_voqc, add_tket])
 if num_compilers == 0:
     st.sidebar.error("At least one compiler should be selected")
 
@@ -104,7 +101,6 @@ else:
 st.sidebar.markdown("#### ** Quantum hardware **")
 hardware_options = ["IBM All2All", "IBM Rueschlikon 16Q", "IBM Falcon 27Q",
                     "Google Sycamore 53Q", "Rigetti Agave 8Q", "Rigetti Aspen 16Q", "IonQ All2All"]
-# col1, col2 = st.columns(2)
 hardw_name = st.sidebar.selectbox("Choose target quantum hardware for compilation", options=hardware_options)
 all2all_hardware = "All2All" in hardw_name
 
@@ -117,8 +113,6 @@ hardw_by_name_dict = {"IBM All2All": "IbmAll2All",
                 "Rigetti Agave 8Q": "RigettiAgave",
                 "Rigetti Aspen 16Q": "RigettiAspen",
                 "IonQ All2All": "IonqAll2All",}
-
-
 
 ######################################
 ######################################
@@ -292,11 +286,6 @@ def run_experiment(target):
                            pl.analyser_report_history[-1]["Connectivity Satisfied"],
                            pl.analyser_report_history[-1]["Gate Set Satisfied"]]
         st.write(pl.analyser_report_history)
-
-    # df_1q = df_1q.set_index('Compiler')
-    # df_2q = df_2q.set_index('Compiler')
-    # df_time = df_time.set_index('Compiler')
-    # df_check = df_check.set_index('Compiler')
 
     return df_1q, df_2q, df_time, df_check
 
