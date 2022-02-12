@@ -53,7 +53,8 @@ compilers_list = [{"Qiskit": add_qiskit},
                   {"PyZX": add_pyzx}]
 
 num_compilers = sum([add_qiskit, add_cirq, add_pyzx,
-                    add_voqc, add_tket])
+                    # add_voqc, add_tket
+                    ])
 if num_compilers == 0:
     st.sidebar.error("At least one compiler should be selected")
 
