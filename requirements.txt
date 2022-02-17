@@ -2,4 +2,4 @@ numpy==1.18.5
 streamlit==0.89.0
 matplotlib==3.2.1
 pandas==1.0.4
-arline-benchmarks
+arline-benchmarks==0.1.8
