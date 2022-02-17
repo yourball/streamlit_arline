@@ -101,7 +101,7 @@ else:
 
 st.sidebar.markdown("#### ** Quantum hardware **")
 hardware_options = ["IBM All2All", "IBM Rueschlikon 16Q", "IBM Falcon 27Q",
-                    "Google Sycamore 53Q", "Rigetti Agave 8Q", "Rigetti Aspen 16Q", "IonQ All2All"]
+                    "Google Sycamore 53Q", "Rigetti Aspen 16Q", "IonQ All2All"]
 hardw_name = st.sidebar.selectbox("Choose target quantum hardware for compilation", options=hardware_options)
 all2all_hardware = "All2All" in hardw_name
 
@@ -111,7 +111,6 @@ hardw_by_name_dict = {"IBM All2All": "IbmAll2All",
                 "IBM Rueschlikon 16Q": "IbmRueschlikon",
                 "IBM Falcon 27Q": "IbmFalcon",
                 "Google Sycamore 53Q": "GoogleSycamore",
-                "Rigetti Agave 8Q": "RigettiAgave",
                 "Rigetti Aspen 16Q": "RigettiAspen",
                 "IonQ All2All": "IonqAll2All",}
 
