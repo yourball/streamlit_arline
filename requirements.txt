@@ -5,3 +5,5 @@ protobuf>=3.13.0
 git+https://github.com/ArlineQ/arline_quantum.git
 git+https://github.com/yourball/arline_benchmarks.git
 stqdm
+plotly
+datetime
