@@ -3,8 +3,8 @@ matplotlib==3.2.1
 pandas==1.0.4
 protobuf>=3.13.0
 streamlit
+stqdm==0.0.4
 git+https://github.com/ArlineQ/arline_quantum.git
 git+https://github.com/yourball/arline_benchmarks.git
-stqdm
 plotly
 datetime
