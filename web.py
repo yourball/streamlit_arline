@@ -269,9 +269,10 @@ def run_experiment(target):
     df_full = pd.DataFrame()
 
     pl_history_list = []
+    progress_bar = st.progress(0)
     for i, pl in enumerate(pipelines_list):
         new_chain = pl.run(target)
-
+        progress_bar.progress(int(100*(i+1)/len(pipelines_list)))
         g_single_qubit_before = pl.analyser_report_history[0]["Single-Qubit Gate Count"]
         d_single_qubit_before = pl.analyser_report_history[0]["Single-Qubit Gate Depth"]
         g_single_qubit_after = pl.analyser_report_history[-1]["Single-Qubit Gate Count"]
@@ -333,7 +334,6 @@ if click:
                                                 ))
         st.plotly_chart(fig_radar, use_container_width=True)
 
-        import pdb; pdb.set_trace()
         fig_2q = go.Figure(data=[
             go.Bar(name='2Q gates count', x=df_2q['Compiler'].values, y=df_2q['2Q gates count after']),
             go.Bar(name='2Q gates depth', x=df_2q['Compiler'].values, y=df_2q['2Q gates depth after']),
