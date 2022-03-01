@@ -1,11 +1,16 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
+import numpy as np
+
 import datetime
 from time import sleep, time
-from stqdm import stqdm
+# from stqdm import stqdm
 import pandas as pd
 from PIL import Image
+
+import plotly.express as px
+import plotly.graph_objects as go
 
 from arline_quantum.gate_chain.gate_chain import GateChain
 from arline_benchmarks.pipeline.pipeline import Pipeline
@@ -20,26 +25,18 @@ from arline_quantum.hardware import hardware_by_name
 from arline_benchmarks.engines.pipeline_engine import PipelineEngine
 import arline_benchmarks.pipeline.pipeline as benchmark_pipeline
 
-# Arline ML imports
-# from arline_ml.compiler.strategies.strategy import Strategy as MlStrategy
-# benchmark_pipeline.Strategy = MlStrategy
-
-# from arline_ml.compiler.strategies.strategy import Strategy
-# from arline_benchmarks.config_parser.pipeline_config_parser import PipelineConfigParser
-# from arline_benchmarks.engines.pipeline_engine import PipelineEngine
-
-# Latex report
-# from arline_benchmarks.reports.latex_report import LatexReport
-
 im = Image.open("arline.png")
 st.set_page_config(page_title='ArlineQ', page_icon=im, layout="wide",)
 
-# st.title("Arline Benchmarks")
 st.markdown("""<p align="center"><h1 align="center">Arline Benchmarks</h1></p>""", unsafe_allow_html=True)
+
+logo = Image.open('logo.png')
+st.sidebar.image(logo)
+
 st.sidebar.markdown("## Quantum compilation frameworks")
 
 add_qiskit = st.sidebar.checkbox("Qiskit", value=True)
-# add_tket = st.sidebar.checkbox("Tket", value=True)
+add_tket = st.sidebar.checkbox("Tket", value=True)
 add_cirq = st.sidebar.checkbox("Cirq", value=True)
 # add_voqc = st.sidebar.checkbox("VOQC", value=True)
 add_pyzx = st.sidebar.checkbox("PyZX", value=True)
@@ -47,47 +44,33 @@ add_pyzx = st.sidebar.checkbox("PyZX", value=True)
 
 
 compilers_list = [{"Qiskit": add_qiskit},
-                  # {"Tket": add_tket},
+                  {"Tket": add_tket},
                   {"Cirq": add_cirq},
                   # {"VOQC": add_voqc},
                   {"PyZX": add_pyzx}]
 
 num_compilers = sum([add_qiskit, add_cirq, add_pyzx,
-                    # add_voqc, add_tket
+                    # add_voqc,
+                    add_tket
                     ])
 if num_compilers == 0:
     st.sidebar.error("At least one compiler should be selected")
 
 
-# compiler_choices = ["Cirq", "Qiskit", "Tket", "VOQC", "PyZX"]
-# compilers_list = []
-# compiler = st.selectbox("Select compilers of interest",
-#                              options=compiler_choices)
-# compilers_list.append(compiler)
-# add_compiler = st.button('Add another compiler')
-
-# custom_pipeline = st.checkbox("Enable advanced mode: build custom compilation pipeline")
-# strategy_list = ["arline_rebase",
-#                  "pytket_mapping", "tket_default",
-#                  "pytket_pauli_simp", "tket_peephole",
-#                  "cx_directed", "tket_remove_redundances",
-#                  "cirq_mapping", "cirq_eject_z", "cirq_eject_phased_paulis",
-#                  "cirq_optimize_for_xmon", "pyzx_full_reduce", "pyzx_full_optimize",
-#                  "qiskit_unroll",
-#                  "qiskit_default", "voqc_default",
-#                 ]
-#
-# if custom_pipeline:
-#     pipeline_layers = st.multiselect('Choose a custom sequence of optimization subroutines',
-#                     options=strategy_list)
-#     st.write("My optimization pipeline", pipeline_layers)
-
 st.markdown("#### ** Choose specifications for the input circuits **")
 
-circ_options = ['from QASM', 'random Clifford+T', 'random Cnot+SU(2)']
-circ_type = st.radio("Choose ", options=circ_options,)
+circ_options = ['from QASM file', 'random Clifford+T', 'random Cnot+SU(2)']
+circ_type = st.radio("Choose input circuit type", options=circ_options,)
 
-random_target = circ_type in ['random Cnot+U3', 'random Clifford+T']
+random_target = 'random' in circ_type
+
+if random_target:
+    with st.expander("How random circuits are generated?"):
+        st.write("""CNOT gates are sampled such that the locations of the control and target qubits are drawn from the uniform distribution.
+        The total number of CNOTs is controlled by the CNOT density parameter.
+        The type of discrete single-qubit gates and their placement is drown from uniform distribution.
+        The continuiuous angles in single-qubit SU(2) gates are sampled from the Haar distribution.""")
+
 if random_target:
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -96,8 +79,12 @@ if random_target:
         num_gates = st.number_input("Number of gates in the input circuit", min_value=1, max_value=300, step=1, value=50)
     with col3:
         density_cx = st.slider("Density of Cnot gates", min_value=0., max_value=1., step=.1, value=0.5)
+    num_qubits_circ = np.int(num_qubits_circ)
+    num_gates = np.int(num_gates)
 else:
     uploaded_file = st.file_uploader("Upload your OpenQASM file", type=['.qasm'])
+
+
 
 st.sidebar.markdown("#### ** Quantum hardware **")
 hardware_options = ["IBM All2All", "IBM Rueschlikon 16Q", "IBM Falcon 27Q",
@@ -134,14 +121,28 @@ else:
             'args': {}
           }
 
-click = st.sidebar.button('Run benchmark')
-# Add Arline logo
-logo = Image.open('logo.png')
-st.sidebar.image(logo)
-
-
 target_hw = hardware_by_name(hw_cfg)
-st.sidebar.write('Output Gate Set:', target_hw.gate_set)
+st.sidebar.write(target_hw.gate_set)
+
+# st.components.v1.html("""<hr>""")
+# st.markdown("""
+# """)
+
+m = st.markdown("""
+<style>
+div.stButton > button:first-child {
+  background-color: #404040; /* #4CAF50; Green */
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  border-radius: 13px;
+}
+</style>""", unsafe_allow_html=True)
+click = st.button('Run benchmark')
 
 cirq_compression = {
     'id': 'cirq_compression',
@@ -205,8 +206,8 @@ CirqPl = Pipeline(pipeline_id="Cirq",
                   stages=[target_analysis, cirq_compression, arline_rebase], run_analyser=run_analyser)
 PyZXPl = Pipeline(pipeline_id="PyZX",
                   stages=[target_analysis, pyzx_full_reduce, arline_rebase], run_analyser=run_analyser)
-VoqcPl = Pipeline(pipeline_id="Voqc",
-                  stages=[target_analysis, voqc, arline_rebase], run_analyser=run_analyser)
+# VoqcPl = Pipeline(pipeline_id="Voqc",
+#                   stages=[target_analysis, voqc, arline_rebase], run_analyser=run_analyser)
 
 pipelines_list = []
 if add_qiskit:
@@ -217,8 +218,8 @@ if add_cirq:
     pipelines_list.append(CirqPl)
 if add_pyzx:
     pipelines_list.append(PyZXPl)
-if add_voqc:
-    pipelines_list.append(VoqcPl)
+# if add_voqc:
+#     pipelines_list.append(VoqcPl)
 
 
 def get_random_targ_cfg(num_qubits, num_gates, circ_type):
@@ -231,7 +232,7 @@ def get_random_targ_cfg(num_qubits, num_gates, circ_type):
                       },
                     },
                   }
-    if circ_type == "random Cnot+U3":
+    if circ_type == "random Cnot+SU(2)":
         hw_cfg = {
                   "hardware": {
                        "gate_set": [
@@ -265,8 +266,10 @@ def run_experiment(target):
     df_2q = pd.DataFrame(columns=columns_2q)
     df_time = pd.DataFrame(columns=columns_time)
     df_check = pd.DataFrame(columns=columns_check)
+    df_full = pd.DataFrame()
 
-    for i, pl in enumerate(stqdm(pipelines_list)):
+    pl_history_list = []
+    for i, pl in enumerate(pipelines_list):
         new_chain = pl.run(target)
 
         g_single_qubit_before = pl.analyser_report_history[0]["Single-Qubit Gate Count"]
@@ -285,11 +288,16 @@ def run_experiment(target):
         df_check.loc[i] = [pl.id,
                            pl.analyser_report_history[-1]["Connectivity Satisfied"],
                            pl.analyser_report_history[-1]["Gate Set Satisfied"]]
-        st.write(pl.analyser_report_history)
+        df_tmp = pd.DataFrame(pl.analyser_report_history)
+        df_tmp['Compiler'] = pl.id
+        pl_history_list.append(df_tmp)
+    df_full = pd.concat(pl_history_list, axis=0)
+    return df_1q, df_2q, df_time, df_check, df_full
 
-    return df_1q, df_2q, df_time, df_check
 
 proceed = True
+if random_target and num_qubits_hardw < num_qubits_circ:
+    st.error("Number of qubits in the quantum circuit must be smaller then number of qubits in the quantum hardware.")
 if click:
     if random_target:
         targ_cfg = get_random_targ_cfg(num_qubits_circ, num_gates, circ_type)
@@ -303,16 +311,63 @@ if click:
             st.error("QASM file is not uploaded")
             proceed = False
     if proceed:
-        df_1q, df_2q, df_time, df_check = run_experiment(target)
-        st.write('Benchmarking is finished. Please check the results below.')
+        df_1q, df_2q, df_time, df_check, df_full = run_experiment(target)
+        st.success('Benchmarking is finished. Please check the results below.')
         st.markdown("#### ** Results **")
-        st.table(df_2q)
+
+        df_merge = pd.concat([df_1q, df_2q], axis=1).T.drop_duplicates().T
+
+        features = ['1Q gates count', '1Q gates depth', '2Q gates count', '2Q gates depth']
+        for cc in features:
+            df_merge[cc+' ratio'] = df_merge[cc+' before'].divide(df_merge[cc+' after'])
+
+        df_merge = df_merge.set_index('Compiler')
+
+        fig_radar = go.Figure(layout=go.Layout(title=go.layout.Title(text="Compression ratio (higher is better)")))
+        theta = [cc+' ratio' for cc in features]
+        for idx in range(len(df_merge)):
+            fig_radar.add_trace(go.Scatterpolar(r=df_merge.iloc[idx].values[-4:],
+                                                theta=theta,
+                                                fill='toself',
+                                                name=df_merge.iloc[idx].name
+                                                ))
+        st.plotly_chart(fig_radar, use_container_width=True)
+
+        import pdb; pdb.set_trace()
+        fig_2q = go.Figure(data=[
+            go.Bar(name='2Q gates count', x=df_2q['Compiler'].values, y=df_2q['2Q gates count after']),
+            go.Bar(name='2Q gates depth', x=df_2q['Compiler'].values, y=df_2q['2Q gates depth after']),
+            ],
+            layout=go.Layout(title=go.layout.Title(text="2Q metrics after compression (lower is better)"))
+            )
+        # Change the bar mode
+        fig_2q.update_layout(barmode='group')
+        st.plotly_chart(fig_2q, use_container_width=True)
+
+        #####################
+        # fig_2q = px.bar(df_2q, x='Compiler', y='2Q gates count after')
+        # st.plotly_chart(fig_2q, use_container_width=True)
+        # st.table(df_2q)
+        #####################
+
         expander_1q = st.expander("1Q gates stats")
+
         with expander_1q:
+            fig_1q = go.Figure(data=[
+                go.Bar(name='1Q gates count', x=df_1q['Compiler'].values, y=df_1q['1Q gates count after']),
+                go.Bar(name='1Q gates depth', x=df_1q['Compiler'].values, y=df_1q['1Q gates depth after']),
+                ],
+                layout=go.Layout(title=go.layout.Title(text="1Q metrics after compression (lower is better)"))
+                )
+            # Change the bar mode
+            fig_1q.update_layout(barmode='group')
+            st.plotly_chart(fig_1q, use_container_width=True)
             st.table(df_1q)
+
         expander_time = st.expander("Runtime stats")
         with expander_time:
-            st.table(df_time)
+            fig_time = px.bar(df_time, x='Compiler', y='Execution time (seconds)')
+            st.plotly_chart(fig_time, use_container_width=True)
         expander_checks = st.expander("Validity checks")
         with expander_checks:
             st.table(df_check)
