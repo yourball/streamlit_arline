@@ -57,7 +57,7 @@ if num_compilers == 0:
     st.sidebar.error("At least one compiler should be selected")
 
 
-st.markdown("#### ** Choose specifications for the input circuits **")
+st.markdown("#### Choose specifications for the input circuits")
 
 circ_options = ['from QASM file', 'random Clifford+T', 'random Cnot+SU(2)']
 circ_type = st.radio("Choose input circuit type", options=circ_options,)
@@ -86,7 +86,7 @@ else:
 
 
 
-st.sidebar.markdown("#### ** Quantum hardware **")
+st.sidebar.markdown("#### Quantum hardware")
 hardware_options = ["IBM All2All", "IBM Rueschlikon 16Q", "IBM Falcon 27Q",
                     "Google Sycamore 53Q", "Rigetti Aspen 16Q", "IonQ All2All"]
 hardw_name = st.sidebar.selectbox("Choose target quantum hardware for compilation", options=hardware_options)
@@ -107,15 +107,12 @@ hardw_by_name_dict = {"IBM All2All": "IbmAll2All",
 if all2all_hardware:
     num_qubits_hardw = st.sidebar.number_input(f"Please specify number of qubits in the target hardware",
                                     min_value=1, max_value=20, step=1, value=10)
-else:
-    st.sidebar.write(f"Selected backend: {hardw_name}")
-
-if all2all_hardware:
     hw_cfg = {
             'class': hardw_by_name_dict[hardw_name],
             'args': {'num_qubits': num_qubits_hardw, }
           }
 else:
+    st.sidebar.write(f"Selected backend: {hardw_name}")
     hw_cfg = {
             'class': hardw_by_name_dict[hardw_name],
             'args': {}
@@ -123,10 +120,7 @@ else:
 
 target_hw = hardware_by_name(hw_cfg)
 st.sidebar.write(target_hw.gate_set)
-
-# st.components.v1.html("""<hr>""")
-# st.markdown("""
-# """)
+num_qubits_hardw = target_hw.qubit_connectivity._num_qubits
 
 m = st.markdown("""
 <style>
@@ -314,7 +308,7 @@ if click:
     if proceed:
         df_1q, df_2q, df_time, df_check, df_full = run_experiment(target)
         st.success('Benchmarking is finished. Please check the results below.')
-        st.markdown("#### ** Results **")
+        st.markdown("#### Results")
 
         df_merge = pd.concat([df_1q, df_2q], axis=1).T.drop_duplicates().T
 
@@ -343,12 +337,6 @@ if click:
         # Change the bar mode
         fig_2q.update_layout(barmode='group')
         st.plotly_chart(fig_2q, use_container_width=True)
-
-        #####################
-        # fig_2q = px.bar(df_2q, x='Compiler', y='2Q gates count after')
-        # st.plotly_chart(fig_2q, use_container_width=True)
-        # st.table(df_2q)
-        #####################
 
         expander_1q = st.expander("1Q gates stats")
 
