@@ -1,9 +1,11 @@
+
+numpy<=1.19.5
 matplotlib==3.2.1
 pandas==1.0.4
 protobuf>=3.13.0
 streamlit
 stqdm==0.0.4
 plotly==4.11.0
-git+https://github.com/yourball/arline_quantum.git@feature/update_arline_quantum
+git+https://github.com/yourball/arline_quantum.git@feature/update_copyright
 git+https://github.com/yourball/arline_benchmarks.git@feature/update_strategies
 datetime
