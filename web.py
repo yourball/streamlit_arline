@@ -60,7 +60,7 @@ if num_compilers == 0:
 st.markdown("#### Choose specifications for the input circuits")
 
 circ_options = ['from QASM file', 'random Clifford+T', 'random Cnot+SU(2)']
-circ_type = st.radio("Choose input circuit type", options=circ_options,)
+circ_type = st.radio("Input circuit type", options=circ_options,)
 
 random_target = 'random' in circ_type
 
@@ -119,7 +119,7 @@ else:
           }
 
 target_hw = hardware_by_name(hw_cfg)
-st.sidebar.write(target_hw.gate_set)
+st.sidebar.write(f'Gate set: {target_hw.gate_set.gate_list}')
 num_qubits_hardw = target_hw.qubit_connectivity._num_qubits
 
 m = st.markdown("""
