@@ -76,7 +76,7 @@ hardw_by_name_dict = {"IBM All2All": "IbmAll2All",
                 "IonQ All2All": "IonqAll2All",}
 
 if all2all_hardware:
-    num_qubits_hardw = st.sidebar.number_input(f"Please specify number of qubits in the target hardware",
+    num_qubits_hardw = st.sidebar.number_input(f"Specify number of qubits in the target hardware",
                                     min_value=1, max_value=20, step=1, value=10)
     hw_cfg = {
             'class': hardw_by_name_dict[hardw_name],
@@ -94,9 +94,9 @@ st.sidebar.markdown(f"Native Gate Set: {target_hw.gate_set.get_gate_names()}")
 
 num_qubits_hardw = target_hw.qubit_connectivity._num_qubits
 
-st.markdown("#### Choose specifications for the input circuits")
+st.markdown("""<h2 style="color:grey"> Choose specifications for the input circuits </h2>""", unsafe_allow_html=True)
 
-circ_options = ['From QASM file', 'Random Clifford+T circuit', 'Random Cnot+SU(2) circuit']
+circ_options = ['From QASM file', 'Random Clifford+T circuit', 'Random Cnot+SU(2) circuit',]
 circ_type = st.radio("Input circuit type", options=circ_options,)
 
 random_target = 'Random' in circ_type
@@ -119,20 +119,48 @@ if random_target:
 else:
     uploaded_file = st.file_uploader("Upload your OpenQASM file", type=['.qasm'])
 
+# m = st.markdown("""
+# <style>
+# div.stButton > button:first-child {
+#   background-color: #4CAF50; /*#404040;*/
+#   border: none;
+#   color: white;
+#   padding: 15px 32px;
+#   text-align: center;
+#   text-decoration: none;
+#   display: inline-block;
+#   font-size: 16px;
+#   border-radius: 13px;
+# }
+# </style>""", unsafe_allow_html=True)
+
 m = st.markdown("""
 <style>
 div.stButton > button:first-child {
-  background-color: #404040; /* #4CAF50; Green */
-  border: none;
-  color: white;
-  padding: 15px 32px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-  font-size: 16px;
-  border-radius: 13px;
+    width: 10em;
+    height: 4em;
+    font-size: 18px;
+    background-color: #4CAF50;
+    color:white;
+    font-size: 16px;
+    border-radius: 13px;
 }
+div.stButton > button:hover {
+    background-color: #0c9131;
+    border-color:none;
+    border-width: 0;
+    color: white;
+    outline: currentcolor none medium;
+    }
+div.stButton > button:focus {
+    background-color: #4CAF50;
+    color:white;
+    border-width: 0;
+    outline: none;
+    outline: currentcolor none medium;
+    }
 </style>""", unsafe_allow_html=True)
+
 click = st.button('Run benchmark')
 
 target_analysis = {
@@ -363,7 +391,7 @@ if click:
             st.warning('PyZX does not contain qubit routing module. Using Qiskit Transpile for routing instead.')
         st.success('Benchmarking is finished. Please check the results below.')
         st.sidebar.markdown("""<hr style="height:4px;color:white;width:100%"></hr>""", unsafe_allow_html=True)
-        st.markdown("""<h2 style="color:#4287f5"> Results </h2>""", unsafe_allow_html=True)
+        st.markdown("""<h2 style="color:grey"> Results </h2>""", unsafe_allow_html=True)
         st.write("""
         """)
 
@@ -395,16 +423,13 @@ if click:
                     layout=go.Layout(title=go.layout.Title(text="2Q metrics after compression (lower is better)"))
                     )
                 fig_2q.update_layout(barmode='group')
-
-
                 st.plotly_chart(fig_2q, use_container_width=True)
 
             st.write("""We define Compression Ratio (CR) for the metrics of interest (gate count, gate depth) as:""")
-            st.latex(r''' CR (\textrm{gate count}, g \in G) = \frac{\textrm{gate count}_{in}}{\textrm{gate count}_{out}}, \quad
-            CR (\textrm{gate depth}, g \in G) = \frac{\textrm{gate depth}_{in}}{\textrm{gate depth}_{out}}''')
+            st.latex(r''' CR (\textrm{gate count}, g \in G) = \frac{\textrm{gate count}_{in}}{\textrm{gate count}_{out}} ''')
+            st.latex(r''' CR (\textrm{gate depth}, g \in G) = \frac{\textrm{gate depth}_{in}}{\textrm{gate depth}_{out}} ''')
 
             st.table(df_2q)
-
 
             expander_1q = st.expander("1Q gates stats")
             with expander_1q:
