@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 import numpy as np
+import re
 
 import datetime
 from time import sleep, time
@@ -11,6 +12,7 @@ from PIL import Image
 
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from arline_quantum.gate_chain.gate_chain import GateChain
 from arline_benchmarks.pipeline.pipeline import Pipeline
@@ -33,66 +35,38 @@ st.markdown("""<p align="center"><h1 align="center">Arline Benchmarks</h1></p>""
 logo = Image.open('logo.png')
 st.sidebar.image(logo)
 
+st.sidebar.markdown("""<hr style="height:2px;color:white;"></hr>""", unsafe_allow_html=True)
 st.sidebar.markdown("## Quantum compilation frameworks")
 
 add_qiskit = st.sidebar.checkbox("Qiskit", value=True)
 add_tket = st.sidebar.checkbox("Tket", value=True)
 add_cirq = st.sidebar.checkbox("Cirq", value=True)
-# add_voqc = st.sidebar.checkbox("VOQC", value=True)
 add_pyzx = st.sidebar.checkbox("PyZX", value=True)
-
+# add_voqc = st.sidebar.checkbox("VOQC", value=True)
 
 
 compilers_list = [{"Qiskit": add_qiskit},
                   {"Tket": add_tket},
                   {"Cirq": add_cirq},
+                  {"PyZX": add_pyzx},
                   # {"VOQC": add_voqc},
-                  {"PyZX": add_pyzx}]
+                  ]
 
-num_compilers = sum([add_qiskit, add_cirq, add_pyzx,
-                    # add_voqc,
-                    add_tket
+num_compilers = sum([add_qiskit, add_cirq, add_pyzx, add_tket,  # add_voqc,
                     ])
 if num_compilers == 0:
     st.sidebar.error("At least one compiler should be selected")
 
 
-st.markdown("#### Choose specifications for the input circuits")
+st.sidebar.markdown("""<hr style="height:2px;color:white;"></hr>""", unsafe_allow_html=True)
 
-circ_options = ['from QASM file', 'random Clifford+T', 'random Cnot+SU(2)']
-circ_type = st.radio("Input circuit type", options=circ_options,)
-
-random_target = 'random' in circ_type
-
-if random_target:
-    with st.expander("How random circuits are generated?"):
-        st.write("""CNOT gates are sampled such that the locations of the control and target qubits are drawn from the uniform distribution.
-        The total number of CNOTs is controlled by the CNOT density parameter.
-        The type of discrete single-qubit gates and their placement is drown from uniform distribution.
-        The continuiuous angles in single-qubit SU(2) gates are sampled from the Haar distribution.""")
-
-if random_target:
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        num_qubits_circ = st.number_input("Number of qubits in input circuit", min_value=1, max_value=20, step=1, value=10)
-    with col2:
-        num_gates = st.number_input("Number of gates in the input circuit", min_value=1, max_value=300, step=1, value=50)
-    with col3:
-        density_cx = st.slider("Density of Cnot gates", min_value=0., max_value=1., step=.1, value=0.5)
-    num_qubits_circ = np.int(num_qubits_circ)
-    num_gates = np.int(num_gates)
-else:
-    uploaded_file = st.file_uploader("Upload your OpenQASM file", type=['.qasm'])
-
-
-
-st.sidebar.markdown("#### Quantum hardware")
+st.sidebar.markdown("## Quantum hardware")
 hardware_options = ["IBM All2All", "IBM Rueschlikon 16Q", "IBM Falcon 27Q",
                     "Google Sycamore 53Q", "Rigetti Aspen 16Q", "IonQ All2All"]
 hardw_name = st.sidebar.selectbox("Choose target quantum hardware for compilation", options=hardware_options)
 all2all_hardware = "All2All" in hardw_name
 
-
+routing_only = st.sidebar.checkbox("Qubit routing only (ignore circuit compression passes)")
 
 hardw_by_name_dict = {"IBM All2All": "IbmAll2All",
                 "IBM Rueschlikon 16Q": "IbmRueschlikon",
@@ -101,9 +75,6 @@ hardw_by_name_dict = {"IBM All2All": "IbmAll2All",
                 "Rigetti Aspen 16Q": "RigettiAspen",
                 "IonQ All2All": "IonqAll2All",}
 
-######################################
-######################################
-######################################
 if all2all_hardware:
     num_qubits_hardw = st.sidebar.number_input(f"Please specify number of qubits in the target hardware",
                                     min_value=1, max_value=20, step=1, value=10)
@@ -119,8 +90,34 @@ else:
           }
 
 target_hw = hardware_by_name(hw_cfg)
-st.sidebar.write(f'Gate set: {target_hw.gate_set.gate_list}')
+st.sidebar.markdown(f"Native Gate Set: {target_hw.gate_set.get_gate_names()}")
+
 num_qubits_hardw = target_hw.qubit_connectivity._num_qubits
+
+st.markdown("#### Choose specifications for the input circuits")
+
+circ_options = ['From QASM file', 'Random Clifford+T circuit', 'Random Cnot+SU(2) circuit']
+circ_type = st.radio("Input circuit type", options=circ_options,)
+
+random_target = 'Random' in circ_type
+
+if random_target:
+    with st.expander("How random circuits are generated?"):
+        st.write("""CNOT gates are sampled such that the locations of the control and target qubits are drawn from the uniform distribution.
+        The total number of CNOTs is controlled by the CNOT density parameter.
+        The type of discrete single-qubit gates and their placement is drown from uniform distribution.
+        The continuiuous angles in single-qubit SU(2) gates are sampled from the Haar distribution.""")
+
+if random_target:
+    col1, col2 = st.columns(2)
+    with col1:
+        num_gates = st.number_input("Number of gates in the input circuit", min_value=1, max_value=300, step=1, value=50)
+    with col2:
+        density_cx = st.slider("Density of Cnot gates", min_value=0., max_value=1., step=.1, value=0.5)
+    num_gates = np.int(num_gates)
+    num_qubits_circ = num_qubits_hardw
+else:
+    uploaded_file = st.file_uploader("Upload your OpenQASM file", type=['.qasm'])
 
 m = st.markdown("""
 <style>
@@ -138,6 +135,12 @@ div.stButton > button:first-child {
 </style>""", unsafe_allow_html=True)
 click = st.button('Run benchmark')
 
+target_analysis = {
+    'id': 'target_analysis',
+    'strategy': 'target_analysis',
+    'args': {
+    },
+}
 cirq_compression = {
     'id': 'cirq_compression',
     'strategy': 'cirq_mapping_compression',
@@ -145,7 +148,13 @@ cirq_compression = {
       'hardware': hw_cfg,
     },
   }
-
+cirq_mapping = {
+    'id': 'cirq_mapping',
+    'strategy': 'cirq_mapping',
+    'args': {
+      'hardware': hw_cfg,
+    },
+  }
 voqc = {
     'id': 'voqc',
     'strategy': 'voqc',
@@ -162,11 +171,28 @@ pytket_compression = {
     },
   }
 
-qiskit_transpile = {
-    'id': 'qiskit_transpile',
+pytket_mapping = {
+    'id': 'pytket_mapping',
+    'strategy': 'pytket_mapping',
+    'args': {
+      'hardware': hw_cfg,
+    },
+  }
+
+qiskit_compression = {
+    'id': 'qiskit_compression',
     'strategy': 'qiskit_transpile',
     'args': {
       'hardware': hw_cfg,
+    },
+  }
+
+qiskit_mapping = {
+    'id': 'qiskit_mapping',
+    'strategy': 'qiskit_transpile',
+    'args': {
+      'hardware': hw_cfg,
+      'optimization_level': 0
     },
   }
 
@@ -185,21 +211,22 @@ arline_rebase = {
       'hardware': hw_cfg,
     },
 }
-target_analysis = {
-    'id': 'target_analysis',
-    'strategy': 'target_analysis',
-    'args': {
-    },
-}
-run_analyser = True
-QiskitPl = Pipeline(pipeline_id="Qiskit",
-                    stages=[target_analysis, qiskit_transpile, arline_rebase], run_analyser=run_analyser)
-PytketPl = Pipeline(pipeline_id="Pytket",
-                    stages=[target_analysis, pytket_compression, arline_rebase], run_analyser=run_analyser)
-CirqPl = Pipeline(pipeline_id="Cirq",
-                  stages=[target_analysis, cirq_compression, arline_rebase], run_analyser=run_analyser)
-PyZXPl = Pipeline(pipeline_id="PyZX",
-                  stages=[target_analysis, pyzx_full_reduce, arline_rebase], run_analyser=run_analyser)
+
+if routing_only:
+    qiskit_stages = [target_analysis, qiskit_mapping, arline_rebase]
+    pytket_stages = [target_analysis, pytket_mapping, arline_rebase]
+    cirq_stages = [target_analysis, cirq_mapping, arline_rebase]
+    pyzx_stages = [target_analysis, qiskit_mapping, arline_rebase]
+else:
+    qiskit_stages = [target_analysis, qiskit_compression, arline_rebase]
+    pytket_stages = [target_analysis, pytket_compression, arline_rebase]
+    cirq_stages = [target_analysis, cirq_compression, arline_rebase]
+    pyzx_stages = [target_analysis, pyzx_full_reduce, arline_rebase]
+
+QiskitPl = Pipeline(pipeline_id="Qiskit", stages=qiskit_stages, run_analyser=True)
+PytketPl = Pipeline(pipeline_id="Pytket", stages=pytket_stages, run_analyser=True)
+CirqPl = Pipeline(pipeline_id="Cirq", stages=cirq_stages, run_analyser=True)
+PyZXPl = Pipeline(pipeline_id="PyZX", stages=pyzx_stages, run_analyser=True)
 # VoqcPl = Pipeline(pipeline_id="Voqc",
 #                   stages=[target_analysis, voqc, arline_rebase], run_analyser=run_analyser)
 
@@ -217,7 +244,7 @@ if add_pyzx:
 
 
 def get_random_targ_cfg(num_qubits, num_gates, circ_type):
-    if circ_type == "random Clifford+T":
+    if circ_type == circ_options[1]:
         hw_cfg = {
                   'hardware':  {
                       'class': 'CliffordTAll2All',
@@ -226,7 +253,7 @@ def get_random_targ_cfg(num_qubits, num_gates, circ_type):
                       },
                     },
                   }
-    if circ_type == "random Cnot+SU(2)":
+    if circ_type == circ_options[2]:
         hw_cfg = {
                   "hardware": {
                        "gate_set": [
@@ -290,6 +317,30 @@ def run_experiment(target):
     return df_1q, df_2q, df_time, df_check, df_full
 
 
+def plot_gate_composition(data, compiler_name):
+    data = data[data['Compiler'] == compiler_name]
+
+    # data = data.reset_index().groupby(by="Stage").aggregate(np.sum)
+    data = data.reset_index()
+    data = data.sort_values("index", ascending=False)
+
+    g_count_sum = data.filter(regex=("Count of .* Gates"), axis=1)
+    g_count_sum = g_count_sum.loc[:, (data != 0).any(axis=0)]
+
+    old_g_names = g_count_sum.columns
+    g_names = [re.search("Count of (.*) Gates", g).group(1) for g in old_g_names]
+    stage_names = ['Target', 'Mapping/Compression', 'Rebase']
+
+    trace = go.Heatmap(
+           x=g_names,
+           y=np.flip(np.array(stage_names)),
+           z=g_count_sum,
+           type='heatmap',
+           colorscale='Blues'
+        )
+    fig = go.Figure(data=[trace], layout=go.Layout(title=go.layout.Title(text=f"{compiler_name}")))
+    st.plotly_chart(fig, use_container_width=True)
+
 proceed = True
 if random_target and num_qubits_hardw < num_qubits_circ:
     st.error("Number of qubits in the quantum circuit must be smaller then number of qubits in the quantum hardware.")
@@ -305,57 +356,79 @@ if click:
         else:
             st.error("QASM file is not uploaded")
             proceed = False
+
     if proceed:
         df_1q, df_2q, df_time, df_check, df_full = run_experiment(target)
+        if not all2all_hardware and add_pyzx:
+            st.warning('PyZX does not contain qubit routing module. Using Qiskit Transpile for routing instead.')
         st.success('Benchmarking is finished. Please check the results below.')
-        st.markdown("#### Results")
+        st.sidebar.markdown("""<hr style="height:4px;color:white;width:100%"></hr>""", unsafe_allow_html=True)
+        st.markdown("""<h2 style="color:#4287f5"> Results </h2>""", unsafe_allow_html=True)
+        st.write("""
+        """)
 
-        df_merge = pd.concat([df_1q, df_2q], axis=1).T.drop_duplicates().T
+        with st.container():
+            df_merge = pd.concat([df_1q, df_2q.drop(['Compiler'], axis=1)], axis=1)
+            features = ['1Q gates count', '1Q gates depth', '2Q gates count', '2Q gates depth']
+            for cc in features:
+                df_merge[cc+' ratio'] = df_merge[cc+' before'].divide(df_merge[cc+' after'])
 
-        features = ['1Q gates count', '1Q gates depth', '2Q gates count', '2Q gates depth']
-        for cc in features:
-            df_merge[cc+' ratio'] = df_merge[cc+' before'].divide(df_merge[cc+' after'])
+            df_merge = df_merge.set_index('Compiler')
 
-        df_merge = df_merge.set_index('Compiler')
+            col1, col2 = st.columns(2)
+            with col1:
+                fig_radar = go.Figure(layout=go.Layout(title=go.layout.Title(text="Compression ratio (higher is better)")))
+                theta = [cc+' ratio' for cc in features]
+                for idx in range(len(df_merge)):
+                    fig_radar.add_trace(go.Scatterpolar(r=df_merge.iloc[idx].values[-4:],
+                                                        theta=theta,
+                                                        fill='toself',
+                                                        name=df_merge.iloc[idx].name
+                                                        ))
+                st.plotly_chart(fig_radar, use_container_width=True)
 
-        fig_radar = go.Figure(layout=go.Layout(title=go.layout.Title(text="Compression ratio (higher is better)")))
-        theta = [cc+' ratio' for cc in features]
-        for idx in range(len(df_merge)):
-            fig_radar.add_trace(go.Scatterpolar(r=df_merge.iloc[idx].values[-4:],
-                                                theta=theta,
-                                                fill='toself',
-                                                name=df_merge.iloc[idx].name
-                                                ))
-        st.plotly_chart(fig_radar, use_container_width=True)
+            with col2:
+                fig_2q = go.Figure(data=[
+                    go.Bar(name='2Q gates count', x=df_2q['Compiler'].values, y=df_2q['2Q gates count after']),
+                    go.Bar(name='2Q gates depth', x=df_2q['Compiler'].values, y=df_2q['2Q gates depth after']),
+                    ],
+                    layout=go.Layout(title=go.layout.Title(text="2Q metrics after compression (lower is better)"))
+                    )
+                fig_2q.update_layout(barmode='group')
 
-        fig_2q = go.Figure(data=[
-            go.Bar(name='2Q gates count', x=df_2q['Compiler'].values, y=df_2q['2Q gates count after']),
-            go.Bar(name='2Q gates depth', x=df_2q['Compiler'].values, y=df_2q['2Q gates depth after']),
-            ],
-            layout=go.Layout(title=go.layout.Title(text="2Q metrics after compression (lower is better)"))
-            )
-        # Change the bar mode
-        fig_2q.update_layout(barmode='group')
-        st.plotly_chart(fig_2q, use_container_width=True)
 
-        expander_1q = st.expander("1Q gates stats")
+                st.plotly_chart(fig_2q, use_container_width=True)
 
-        with expander_1q:
-            fig_1q = go.Figure(data=[
-                go.Bar(name='1Q gates count', x=df_1q['Compiler'].values, y=df_1q['1Q gates count after']),
-                go.Bar(name='1Q gates depth', x=df_1q['Compiler'].values, y=df_1q['1Q gates depth after']),
-                ],
-                layout=go.Layout(title=go.layout.Title(text="1Q metrics after compression (lower is better)"))
-                )
-            # Change the bar mode
-            fig_1q.update_layout(barmode='group')
-            st.plotly_chart(fig_1q, use_container_width=True)
-            st.table(df_1q)
+            st.write("""We define Compression Ratio (CR) for the metrics of interest (gate count, gate depth) as:""")
+            st.latex(r''' CR (\textrm{gate count}, g \in G) = \frac{\textrm{gate count}_{in}}{\textrm{gate count}_{out}}, \quad
+            CR (\textrm{gate depth}, g \in G) = \frac{\textrm{gate depth}_{in}}{\textrm{gate depth}_{out}}''')
 
-        expander_time = st.expander("Runtime stats")
-        with expander_time:
-            fig_time = px.bar(df_time, x='Compiler', y='Execution time (seconds)')
-            st.plotly_chart(fig_time, use_container_width=True)
-        expander_checks = st.expander("Validity checks")
-        with expander_checks:
-            st.table(df_check)
+            st.table(df_2q)
+
+
+            expander_1q = st.expander("1Q gates stats")
+            with expander_1q:
+                fig_1q = go.Figure(data=[
+                    go.Bar(name='1Q gates count', x=df_1q['Compiler'].values, y=df_1q['1Q gates count after']),
+                    go.Bar(name='1Q gates depth', x=df_1q['Compiler'].values, y=df_1q['1Q gates depth after']),
+                    ],
+                    layout=go.Layout(title=go.layout.Title(text="1Q metrics after compression (lower is better)"))
+                    )
+                fig_1q.update_layout(barmode='group')
+                st.plotly_chart(fig_1q, use_container_width=True)
+                st.table(df_1q)
+
+            with st.expander("Gate composition (gate counts) for each compilation stage"):
+                compiler_names = df_full['Compiler'].unique()
+                cols = st.columns(len(compiler_names))
+                for idx in range(len(cols)):
+                    with cols[idx]:
+                        plot_gate_composition(df_full, compiler_names[idx])
+
+            expander_time = st.expander("Runtime stats")
+            with expander_time:
+                fig_time = px.bar(df_time, x='Compiler', y='Execution time (seconds)')
+                st.plotly_chart(fig_time, use_container_width=True)
+            expander_checks = st.expander("Validity checks")
+            with expander_checks:
+                st.table(df_check)
