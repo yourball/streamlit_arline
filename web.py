@@ -33,7 +33,7 @@ st.set_page_config(page_title='ArlineQ', page_icon=im, layout="wide",)
 st.markdown("""<p align="center"><h1 align="center">Arline Benchmarks</h1></p>""", unsafe_allow_html=True)
 
 logo = Image.open('logo.png')
-st.sidebar.image(logo)
+# st.sidebar.image(logo)
 
 st.sidebar.markdown("""<hr style="height:2px;color:white;"></hr>""", unsafe_allow_html=True)
 st.sidebar.markdown("## Quantum compilation frameworks")
