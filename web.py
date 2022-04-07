@@ -6,7 +6,6 @@ import re
 
 import datetime
 from time import sleep, time
-# from stqdm import stqdm
 import pandas as pd
 from PIL import Image
 
@@ -31,9 +30,7 @@ im = Image.open("arline.png")
 st.set_page_config(page_title='ArlineQ', page_icon=im, layout="wide",)
 
 st.markdown("""<p align="center"><h1 align="center">Arline Benchmarks</h1></p>""", unsafe_allow_html=True)
-
 logo = Image.open('logo.png')
-# st.sidebar.image(logo)
 
 st.sidebar.markdown("""<hr style="height:2px;color:white;"></hr>""", unsafe_allow_html=True)
 st.sidebar.markdown("## Quantum compilation frameworks")
@@ -42,18 +39,18 @@ add_qiskit = st.sidebar.checkbox("Qiskit", value=True)
 add_tket = st.sidebar.checkbox("Tket", value=True)
 add_cirq = st.sidebar.checkbox("Cirq", value=True)
 add_pyzx = st.sidebar.checkbox("PyZX", value=True)
-# add_voqc = st.sidebar.checkbox("VOQC", value=True)
+add_voqc = st.sidebar.checkbox("VOQC", value=True)
 
 
 compilers_list = [{"Qiskit": add_qiskit},
                   {"Tket": add_tket},
                   {"Cirq": add_cirq},
                   {"PyZX": add_pyzx},
-                  # {"VOQC": add_voqc},
-                  ]
+                  {"VOQC": add_voqc},]
 
-num_compilers = sum([add_qiskit, add_cirq, add_pyzx, add_tket,  # add_voqc,
-                    ])
+
+num_compilers = sum([add_qiskit, add_cirq, add_pyzx, add_tket, add_voqc])
+
 if num_compilers == 0:
     st.sidebar.error("At least one compiler should be selected")
 
@@ -69,15 +66,15 @@ all2all_hardware = "All2All" in hardw_name
 routing_only = st.sidebar.checkbox("Qubit routing only (ignore circuit compression passes)")
 
 hardw_by_name_dict = {"IBM All2All": "IbmAll2All",
-                "IBM Rueschlikon 16Q": "IbmRueschlikon",
-                "IBM Falcon 27Q": "IbmFalcon",
-                "Google Sycamore 53Q": "GoogleSycamore",
-                "Rigetti Aspen 16Q": "RigettiAspen",
-                "IonQ All2All": "IonqAll2All",}
+                    "IBM Rueschlikon 16Q": "IbmRueschlikon",
+                    "IBM Falcon 27Q": "IbmFalcon",
+                    "Google Sycamore 53Q": "GoogleSycamore",
+                    "Rigetti Aspen 16Q": "RigettiAspen",
+                    "IonQ All2All": "IonqAll2All",}
 
 if all2all_hardware:
     num_qubits_hardw = st.sidebar.number_input(f"Specify number of qubits in the target hardware",
-                                    min_value=1, max_value=20, step=1, value=10)
+                                               min_value=1, max_value=20, step=1, value=10)
     hw_cfg = {
             'class': hardw_by_name_dict[hardw_name],
             'args': {'num_qubits': num_qubits_hardw, }
@@ -91,6 +88,7 @@ else:
 
 target_hw = hardware_by_name(hw_cfg)
 st.sidebar.markdown(f"Native Gate Set: {target_hw.gate_set.get_gate_names()}")
+final_rebase = st.sidebar.checkbox("Rebase final circuit to hardware-native gate set", value=True)
 
 num_qubits_hardw = target_hw.qubit_connectivity._num_qubits
 
@@ -118,21 +116,6 @@ if random_target:
     num_qubits_circ = num_qubits_hardw
 else:
     uploaded_file = st.file_uploader("Upload your OpenQASM file", type=['.qasm'])
-
-# m = st.markdown("""
-# <style>
-# div.stButton > button:first-child {
-#   background-color: #4CAF50; /*#404040;*/
-#   border: none;
-#   color: white;
-#   padding: 15px 32px;
-#   text-align: center;
-#   text-decoration: none;
-#   display: inline-block;
-#   font-size: 16px;
-#   border-radius: 13px;
-# }
-# </style>""", unsafe_allow_html=True)
 
 m = st.markdown("""
 <style>
@@ -183,9 +166,9 @@ cirq_mapping = {
       'hardware': hw_cfg,
     },
   }
-voqc = {
-    'id': 'voqc',
-    'strategy': 'voqc',
+voqc_optimize = {
+    'id': 'voqc_optimize',
+    'strategy': 'voqc_optimize',
     'args': {
       'hardware': hw_cfg,
     },
@@ -241,22 +224,30 @@ arline_rebase = {
 }
 
 if routing_only:
-    qiskit_stages = [target_analysis, qiskit_mapping, arline_rebase]
-    pytket_stages = [target_analysis, pytket_mapping, arline_rebase]
-    cirq_stages = [target_analysis, cirq_mapping, arline_rebase]
-    pyzx_stages = [target_analysis, qiskit_mapping, arline_rebase]
+    qiskit_stages = [target_analysis, qiskit_mapping]
+    pytket_stages = [target_analysis, pytket_mapping]
+    cirq_stages = [target_analysis, cirq_mapping]
+    pyzx_stages = [target_analysis, qiskit_mapping]
+    voqc_stages = [target_analysis, qiskit_mapping]
 else:
-    qiskit_stages = [target_analysis, qiskit_compression, arline_rebase]
-    pytket_stages = [target_analysis, pytket_compression, arline_rebase]
-    cirq_stages = [target_analysis, cirq_compression, arline_rebase]
-    pyzx_stages = [target_analysis, pyzx_full_reduce, arline_rebase]
+    qiskit_stages = [target_analysis, qiskit_compression]
+    pytket_stages = [target_analysis, pytket_compression]
+    cirq_stages = [target_analysis, cirq_compression]
+    pyzx_stages = [target_analysis, pyzx_full_reduce]
+    voqc_stages = [target_analysis, voqc_optimize]
+
+if final_rebase:
+    qiskit_stages.append(arline_rebase)
+    pytket_stages.append(arline_rebase)
+    cirq_stages.append(arline_rebase)
+    pyzx_stages.append(arline_rebase)
+    voqc_stages.append(arline_rebase)
 
 QiskitPl = Pipeline(pipeline_id="Qiskit", stages=qiskit_stages, run_analyser=True)
 PytketPl = Pipeline(pipeline_id="Pytket", stages=pytket_stages, run_analyser=True)
 CirqPl = Pipeline(pipeline_id="Cirq", stages=cirq_stages, run_analyser=True)
 PyZXPl = Pipeline(pipeline_id="PyZX", stages=pyzx_stages, run_analyser=True)
-# VoqcPl = Pipeline(pipeline_id="Voqc",
-#                   stages=[target_analysis, voqc, arline_rebase], run_analyser=run_analyser)
+VoqcPl = Pipeline(pipeline_id="Voqc", stages=voqc_stages, run_analyser=True)
 
 pipelines_list = []
 if add_qiskit:
@@ -267,8 +258,8 @@ if add_cirq:
     pipelines_list.append(CirqPl)
 if add_pyzx:
     pipelines_list.append(PyZXPl)
-# if add_voqc:
-#     pipelines_list.append(VoqcPl)
+if add_voqc:
+    pipelines_list.append(VoqcPl)
 
 
 def get_random_targ_cfg(num_qubits, num_gates, circ_type):
@@ -309,10 +300,12 @@ def run_experiment(target):
                '1Q gates count after', '1Q gates depth after']
     columns_2q = ['Compiler', '2Q gates count before', '2Q gates depth before',
                '2Q gates count after', '2Q gates depth after']
+    columns_tcount = ['Compiler', 'T gates count before', 'T gates count after']
     columns_time = ['Compiler', 'Execution time (seconds)']
     columns_check = ['Compiler', 'Connectivity Satisfied', 'Gateset Satisfied']
     df_1q = pd.DataFrame(columns=columns_1q)
     df_2q = pd.DataFrame(columns=columns_2q)
+    df_tcount = pd.DataFrame(columns=columns_tcount)
     df_time = pd.DataFrame(columns=columns_time)
     df_check = pd.DataFrame(columns=columns_check)
     df_full = pd.DataFrame()
@@ -332,17 +325,23 @@ def run_experiment(target):
         g_count_after = pl.analyser_report_history[-1]["Two-Qubit Gate Count"]
         d_cnot_after = pl.analyser_report_history[-1]["Two-Qubit Gate Depth"]
 
+        print(pl.analyser_report_history[0])
+        tcount_before = pl.analyser_report_history[0]["Count of T Gates"]
+        tcount_after = pl.analyser_report_history[-1]["Count of T Gates"]
+
         df_1q.loc[i] = [pl.id, g_single_qubit_before, d_single_qubit_before, g_single_qubit_after, d_single_qubit_after]
         df_2q.loc[i] = [pl.id, g_count_before, d_cnot_before, g_count_after, d_cnot_after]
-        df_time.loc[i] = [pl.id, pl.analyser_report_history[-2]["Total Execution Time"]]
+        df_tcount.loc[i] = [pl.id, tcount_before, tcount_after]
+        df_time.loc[i] = [pl.id, pl.analyser_report_history[-1]["Total Execution Time"]]
         df_check.loc[i] = [pl.id,
                            pl.analyser_report_history[-1]["Connectivity Satisfied"],
                            pl.analyser_report_history[-1]["Gate Set Satisfied"]]
         df_tmp = pd.DataFrame(pl.analyser_report_history)
         df_tmp['Compiler'] = pl.id
         pl_history_list.append(df_tmp)
+        print(pl.strategy_list)
     df_full = pd.concat(pl_history_list, axis=0)
-    return df_1q, df_2q, df_time, df_check, df_full
+    return df_1q, df_2q, df_tcount, df_time, df_check, df_full
 
 
 def plot_gate_composition(data, compiler_name):
@@ -357,11 +356,11 @@ def plot_gate_composition(data, compiler_name):
 
     old_g_names = g_count_sum.columns
     g_names = [re.search("Count of (.*) Gates", g).group(1) for g in old_g_names]
-    stage_names = ['Target', 'Mapping/Compression', 'Rebase']
+    stage_names = np.flip(['stage ' + str(i) for i in range(len(data))])
 
     trace = go.Heatmap(
            x=g_names,
-           y=np.flip(np.array(stage_names)),
+           y=stage_names,
            z=g_count_sum,
            type='heatmap',
            colorscale='Blues'
@@ -386,9 +385,12 @@ if click:
             proceed = False
 
     if proceed:
-        df_1q, df_2q, df_time, df_check, df_full = run_experiment(target)
+        df_1q, df_2q, df_tcount, df_time, df_check, df_full = run_experiment(target)
         if not all2all_hardware and add_pyzx:
-            st.warning('PyZX does not contain qubit routing module. Using Qiskit Transpile for routing instead.')
+            st.warning('PyZX does not contain native qubit routing module. Using Qiskit Transpile for routing instead.')
+        if not all2all_hardware and add_voqc:
+            st.warning('VOQC does not contain native qubit routing module. Using Qiskit Transpile for routing instead.')
+
         st.success('Benchmarking is finished. Please check the results below.')
         st.sidebar.markdown("""<hr style="height:4px;color:white;width:100%"></hr>""", unsafe_allow_html=True)
         st.markdown("""<h2 style="color:grey"> Results </h2>""", unsafe_allow_html=True)
@@ -402,7 +404,6 @@ if click:
                 df_merge[cc+' ratio'] = df_merge[cc+' before'].divide(df_merge[cc+' after'])
 
             df_merge = df_merge.set_index('Compiler')
-
             col1, col2 = st.columns(2)
             with col1:
                 fig_radar = go.Figure(layout=go.Layout(title=go.layout.Title(text="Compression ratio (higher is better)")))
@@ -442,6 +443,18 @@ if click:
                 fig_1q.update_layout(barmode='group')
                 st.plotly_chart(fig_1q, use_container_width=True)
                 st.table(df_1q)
+
+            expander_tcount = st.expander("T gates stats")
+            with expander_tcount:
+                fig_tcount = go.Figure(data=[
+                    go.Bar(name='T gates count before', x=df_tcount['Compiler'].values, y=df_tcount['T gates count before']),
+                    go.Bar(name='T gates count after', x=df_tcount['Compiler'].values, y=df_tcount['T gates count after']),
+                    ],
+                    layout=go.Layout(title=go.layout.Title(text="Fault-tolerant metric - T gates count (lower is better)"))
+                    )
+                fig_tcount.update_layout(barmode='group')
+                st.plotly_chart(fig_tcount, use_container_width=True)
+                st.table(df_tcount)
 
             with st.expander("Gate composition (gate counts) for each compilation stage"):
                 compiler_names = df_full['Compiler'].unique()
