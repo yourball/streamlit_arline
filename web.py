@@ -37,14 +37,14 @@ st.sidebar.markdown("## Quantum compilation frameworks")
 
 add_qiskit = st.sidebar.checkbox("Qiskit", value=True)
 add_tket = st.sidebar.checkbox("Tket", value=True)
-add_cirq = st.sidebar.checkbox("Cirq", value=True)
+add_cirq = False  # st.sidebar.checkbox("Cirq", value=True)
 add_pyzx = st.sidebar.checkbox("PyZX", value=True)
 add_voqc = st.sidebar.checkbox("VOQC", value=True)
 
 
 compilers_list = [{"Qiskit": add_qiskit},
                   {"Tket": add_tket},
-                  {"Cirq": add_cirq},
+                  # {"Cirq": add_cirq},
                   {"PyZX": add_pyzx},
                   {"VOQC": add_voqc},]
 
@@ -207,6 +207,14 @@ qiskit_mapping = {
     },
   }
 
+unroll = {
+    'id': 'unroll',
+    'strategy': 'qiskit_unroll',
+    'args': {
+      'hardware': hw_cfg,
+    },
+  }
+
 pyzx_full_reduce = {
     'id': 'pyzx_full_reduce',
     'strategy': 'pyzx_full_reduce',
@@ -224,17 +232,17 @@ arline_rebase = {
 }
 
 if routing_only:
-    qiskit_stages = [target_analysis, qiskit_mapping]
-    pytket_stages = [target_analysis, pytket_mapping]
-    cirq_stages = [target_analysis, cirq_mapping]
-    pyzx_stages = [target_analysis, qiskit_mapping]
-    voqc_stages = [target_analysis, qiskit_mapping]
+    qiskit_stages = [target_analysis, unroll, qiskit_mapping]
+    pytket_stages = [target_analysis, unroll, pytket_mapping]
+    cirq_stages = [target_analysis, unroll, cirq_mapping]
+    pyzx_stages = [target_analysis, unroll, qiskit_mapping]
+    voqc_stages = [target_analysis, unroll, qiskit_mapping]
 else:
-    qiskit_stages = [target_analysis, qiskit_compression]
-    pytket_stages = [target_analysis, pytket_compression]
-    cirq_stages = [target_analysis, cirq_compression]
-    pyzx_stages = [target_analysis, pyzx_full_reduce]
-    voqc_stages = [target_analysis, voqc_optimize]
+    qiskit_stages = [target_analysis, unroll, qiskit_compression]
+    pytket_stages = [target_analysis, unroll, pytket_compression]
+    cirq_stages = [target_analysis, unroll, cirq_compression]
+    pyzx_stages = [target_analysis, unroll, pyzx_full_reduce]
+    voqc_stages = [target_analysis, unroll, voqc_optimize]
 
 if final_rebase:
     qiskit_stages.append(arline_rebase)
@@ -315,18 +323,20 @@ def run_experiment(target):
     for i, pl in enumerate(pipelines_list):
         new_chain = pl.run(target)
         progress_bar.progress(int(100*(i+1)/len(pipelines_list)))
-        g_single_qubit_before = pl.analyser_report_history[0]["Single-Qubit Gate Count"]
-        d_single_qubit_before = pl.analyser_report_history[0]["Single-Qubit Gate Depth"]
+
+        in_stage = 1
+        g_single_qubit_before = pl.analyser_report_history[in_stage]["Single-Qubit Gate Count"]
+        d_single_qubit_before = pl.analyser_report_history[in_stage]["Single-Qubit Gate Depth"]
         g_single_qubit_after = pl.analyser_report_history[-1]["Single-Qubit Gate Count"]
         d_single_qubit_after = pl.analyser_report_history[-1]["Single-Qubit Gate Depth"]
 
-        g_count_before = pl.analyser_report_history[0]["Two-Qubit Gate Count"]
-        d_cnot_before = pl.analyser_report_history[0]["Two-Qubit Gate Depth"]
+        g_count_before = pl.analyser_report_history[in_stage]["Two-Qubit Gate Count"]
+        d_cnot_before = pl.analyser_report_history[in_stage]["Two-Qubit Gate Depth"]
         g_count_after = pl.analyser_report_history[-1]["Two-Qubit Gate Count"]
         d_cnot_after = pl.analyser_report_history[-1]["Two-Qubit Gate Depth"]
 
-        print(pl.analyser_report_history[0])
-        tcount_before = pl.analyser_report_history[0]["Count of T Gates"]
+        print(pl.analyser_report_history[in_stage])
+        tcount_before = pl.analyser_report_history[in_stage]["Count of T Gates"]
         tcount_after = pl.analyser_report_history[-1]["Count of T Gates"]
 
         df_1q.loc[i] = [pl.id, g_single_qubit_before, d_single_qubit_before, g_single_qubit_after, d_single_qubit_after]
