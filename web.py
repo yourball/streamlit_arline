@@ -3,11 +3,18 @@ import streamlit.components.v1 as components
 
 import numpy as np
 import re
+import os
+import io
 
 import datetime
 from time import sleep, time
 import pandas as pd
 from PIL import Image
+
+from io import BytesIO
+import zipfile
+import tempfile
+from io import StringIO
 
 import plotly.express as px
 import plotly.graph_objects as go
@@ -27,6 +34,16 @@ from arline_benchmarks.engines.pipeline_engine import PipelineEngine
 import arline_benchmarks.pipeline.pipeline as benchmark_pipeline
 
 from q_dynamics import trotter_dynamics
+
+
+def converting_strings_to_zip(list):
+    zip_file = zipfile.ZipFile(BytesIO(), 'a', zipfile.ZIP_DEFLATED)
+    file_name = 'out.zip'
+
+    for i, el in enumerate(list):
+        zip_file.writestr("circ"+str(i)+".qasm", str.encode(el))
+    return zip_file
+
 
 im = Image.open("arline.png")
 st.set_page_config(page_title='ArlineQ', page_icon=im, layout="wide",)
@@ -335,9 +352,12 @@ def run_experiment(target):
 
     pl_history_list = []
     progress_bar = st.progress(0)
+
+    optimized_qasm_list = []
     for i, pl in enumerate(pipelines_list):
         new_chain = pl.run(target)
         progress_bar.progress(int(100*(i+1)/len(pipelines_list)))
+        optimized_qasm_list.append(new_chain.to_qasm())
 
         in_stage = 1
         g_single_qubit_before = pl.analyser_report_history[in_stage]["Single-Qubit Gate Count"]
@@ -366,7 +386,7 @@ def run_experiment(target):
         pl_history_list.append(df_tmp)
         print(pl.strategy_list)
     df_full = pd.concat(pl_history_list, axis=0)
-    return df_1q, df_2q, df_tcount, df_time, df_check, df_full
+    return df_1q, df_2q, df_tcount, df_time, df_check, df_full, optimized_qasm_list
 
 
 def plot_gate_composition(data, compiler_name):
@@ -416,7 +436,7 @@ if click:
             proceed = False
 
     if proceed:
-        df_1q, df_2q, df_tcount, df_time, df_check, df_full = run_experiment(target)
+        df_1q, df_2q, df_tcount, df_time, df_check, df_full, optimized_qasm_list = run_experiment(target)
         if not all2all_hardware and add_pyzx:
             st.warning('PyZX does not contain native qubit routing module. Using Qiskit Transpile for routing instead.')
         if not all2all_hardware and add_voqc:
@@ -501,3 +521,21 @@ if click:
             expander_checks = st.expander("Validity checks")
             with expander_checks:
                 st.table(df_check)
+
+    input_circuit = target.to_qasm()
+
+    cols = st.columns(num_compilers+1)
+    with cols[0]:
+        bt1 = st.download_button(
+            label="Download target circuit",
+            data=input_circuit,
+            file_name="target.qasm",
+        )
+    for i in range(num_compilers):
+        compiler_name = list(compilers_list[i].keys())[0]
+        with cols[i+1]:
+            st.download_button(
+                label=f"Download output: {compiler_name}",
+                data=optimized_qasm_list[i],
+                file_name=compiler_name+"_optimized.qasm",
+            )
