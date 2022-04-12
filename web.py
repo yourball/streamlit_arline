@@ -26,12 +26,12 @@ from arline_quantum.hardware import hardware_by_name
 from arline_benchmarks.engines.pipeline_engine import PipelineEngine
 import arline_benchmarks.pipeline.pipeline as benchmark_pipeline
 
+from q_dynamics import trotter_dynamics
+
 im = Image.open("arline.png")
 st.set_page_config(page_title='ArlineQ', page_icon=im, layout="wide",)
 
 st.markdown("""<p align="center"><h1 align="center">Arline Benchmarks</h1></p>""", unsafe_allow_html=True)
-logo = Image.open('logo.png')
-
 st.sidebar.markdown("""<hr style="height:2px;color:white;"></hr>""", unsafe_allow_html=True)
 st.sidebar.markdown("## Quantum compilation frameworks")
 
@@ -94,10 +94,11 @@ num_qubits_hardw = target_hw.qubit_connectivity._num_qubits
 
 st.markdown("""<h2 style="color:grey"> Choose specifications for the input circuits </h2>""", unsafe_allow_html=True)
 
-circ_options = ['From QASM file', 'Random Clifford+T circuit', 'Random Cnot+SU(2) circuit',]
+circ_options = ['From QASM file', 'Random Clifford+T circuit', 'Random Cnot+SU(2) circuit', 'Trotter formula']
 circ_type = st.radio("Input circuit type", options=circ_options,)
 
 random_target = 'Random' in circ_type
+q_dynamics_target = 'Trotter' in circ_type
 
 if random_target:
     with st.expander("How random circuits are generated?"):
@@ -105,8 +106,6 @@ if random_target:
         The total number of CNOTs is controlled by the CNOT density parameter.
         The type of discrete single-qubit gates and their placement is drown from uniform distribution.
         The continuiuous angles in single-qubit SU(2) gates are sampled from the Haar distribution.""")
-
-if random_target:
     col1, col2 = st.columns(2)
     with col1:
         num_gates = st.number_input("Number of gates in the input circuit", min_value=1, max_value=300, step=1, value=50)
@@ -114,8 +113,24 @@ if random_target:
         density_cx = st.slider("Density of Cnot gates", min_value=0., max_value=1., step=.1, value=0.5)
     num_gates = np.int(num_gates)
     num_qubits_circ = num_qubits_hardw
+elif q_dynamics_target:
+    with st.expander("Trotter formula details"):
+        st.write("""We generate quantum circuit corresponding to the 1st order Suzuki-Trotter product formula.
+        The target model is the Transvewrsal field Ising model with the Hamiltonian of the type H=ZZ+h*X.
+        The evolution time is split in dt-blocks (Trotter steps), the product formula is repediately applied in the each step.
+        We impose periodic boundary condition.
+         """)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        num_qubits_circ = st.number_input("Number of spins in Ising model", min_value=3, step=1, value=10)
+    with col2:
+        trotter_steps = st.number_input("Number of Trotter steps", min_value=1, max_value=10, step=1, value=5)
+    with col3:
+        h_field_coef = st.slider("Transversal field", min_value=0., max_value=2., step=0.1, value=1.)
 else:
-    uploaded_file = st.file_uploader("Upload your OpenQASM file", type=['.qasm'])
+    uploaded_file = st.file_uploader("Upload your OpenQASM file",
+                                     type=['.qasm'],
+                                     accept_multiple_files=True)
 
 m = st.markdown("""
 <style>
@@ -381,11 +396,17 @@ def plot_gate_composition(data, compiler_name):
 proceed = True
 if random_target and num_qubits_hardw < num_qubits_circ:
     st.error("Number of qubits in the quantum circuit must be smaller then number of qubits in the quantum hardware.")
+
+# Clicked Run Benchmarks button
 if click:
+    # Generate target depending on the target type
     if random_target:
         targ_cfg = get_random_targ_cfg(num_qubits_circ, num_gates, circ_type)
         target_generator = Target.from_config(config=targ_cfg)
         target = next(target_generator)[0]
+    elif q_dynamics_target:
+        qasm_data = trotter_dynamics(num_qubits_circ, trotter_steps, h_field_coef, seed=1)
+        target = GateChain.from_qasm_string(qasm_data)
     else:
         if uploaded_file is not None:
             qasm_data = str(uploaded_file.read(), "utf-8")
